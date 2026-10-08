@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+build/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Environment files (keep the example)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+
+# OS files
+.DS_Store
+__MACOSX/
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.suo
+
+# Note: k8s/postgres-secret.yaml is intentionally committed. It contains
+# demo-only credentials required by the assignment. Never commit real secrets.

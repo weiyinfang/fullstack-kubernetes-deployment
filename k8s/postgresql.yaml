@@ -1,0 +1,89 @@
+# -------------------------
+# Persistent Volume (for data storage) (Do not change this part)
+# -------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+  labels:
+    type: local
+spec:
+  storageClassName: standard
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: "/mnt/data"
+---
+# -------------------------
+# Persistent Volume Claim (for data storage) (Do not change this part)
+# -------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard
+
+---
+# -------------------------
+# Deployment
+# -------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres # Do not change this name
+spec:
+  replicas: 1 # Do not change this
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          env:
+            - name: POSTGRES_DB
+              value: "myappdb"
+          volumeMounts: # Do not edit this section
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+      volumes: # Do not edit this section
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+
+---
+# -------------------------
+# Service
+# -------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres # Do not change this name
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: 5432
+
+

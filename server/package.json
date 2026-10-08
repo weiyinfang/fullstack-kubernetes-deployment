@@ -1,0 +1,51 @@
+{
+  "name": "test-nodejs-server",
+  "version": "1.0.0",
+  "description": "A basic Express.js server",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "migrate": "npx sequelize-cli db:migrate",
+    "migrate:down": "npx sequelize-cli db:migrate:undo",
+    "lint": "eslint .",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "eslint": "^9.36.0",
+    "express": "^5.1.0",
+    "pg": "^8.16.3",
+    "sequelize": "^6.37.3",
+    "sequelize-cli": "^6.6.2"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js",
+      "**/?(*.)+(spec|test).js"
+    ],
+    "silent": true,
+    "verbose": false,
+    "collectCoverageFrom": [
+      "server.js",
+      "!node_modules/**"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ]
+  },
+  "devDependencies": {
+    "jest": "^29.5.0",
+    "supertest": "^6.3.4"
+  }
+}
