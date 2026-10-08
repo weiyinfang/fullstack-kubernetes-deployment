@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: API tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    name: Deploy to kind
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images
+        run: |
+          docker build -t nodejs-backend:v1 ./server
+          docker build -t reactjs-ui:v1     ./client
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kind
+
+      - name: Load images into the cluster
+        run: kind load docker-image nodejs-backend:v1 reactjs-ui:v1 --name kind
+
+      # Same order as the README
+      - name: Deploy
+        run: |
+          kubectl apply -f k8s/postgres-secret.yaml
+          kubectl apply -f k8s/postgresql.yaml
+          kubectl rollout status deployment/postgres --timeout=180s
+          kubectl apply -f k8s/migration-job.yaml
+          kubectl wait --for=condition=complete job/db-migration --timeout=300s
+          kubectl apply -f k8s/backend.yaml
+          kubectl rollout status deployment/backend --timeout=180s
+          kubectl apply -f k8s/frontend.yaml
+          kubectl rollout status deployment/frontend --timeout=180s
+
+      - name: Check every layer through the frontend
+        run: |
+          kubectl port-forward svc/frontend 8080:80 > /dev/null 2>&1 &
+          for i in $(seq 1 30); do curl -fs http://localhost:8080/health && break; sleep 1; done
+          curl -fsS http://localhost:8080/health | grep -q healthy
+          curl -fsS http://localhost:8080/api/health | jq -e '.status == "OK"'
+          curl -fsS http://localhost:8080/api/students   | jq -e 'length > 0'
+          curl -fsS http://localhost:8080/api/courses    | jq -e 'length > 0'
+          curl -fsS http://localhost:8080/api/professors | jq -e 'length > 0'
+          mkdir -p ci-output
+          kubectl get pods,svc,pvc,jobs -o wide | tee ci-output/kubectl-get.txt
+
+      - name: Screenshot the app
+        run: |
+          npx -y playwright install --with-deps chromium
+          npx -y playwright screenshot --viewport-size=1280,800 --wait-for-timeout=3000 \
+            http://localhost:8080 ci-output/app.png
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          kubectl get all -o wide
+          kubectl describe pods
+          kubectl logs job/db-migration --all-containers || true
+          kubectl logs deployment/backend --all-containers || true
+          kubectl logs deployment/frontend --all-containers || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-output
+          path: ci-output/
+          if-no-files-found: ignore
