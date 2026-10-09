@@ -14,8 +14,8 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 18
           cache: npm
@@ -28,7 +28,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build images
         run: |
@@ -70,9 +70,10 @@ jobs:
 
       - name: Screenshot the app
         run: |
-          npx -y playwright install --with-deps chromium
-          npx -y playwright screenshot --viewport-size=1280,800 --wait-for-timeout=3000 \
-            http://localhost:8080 ci-output/app.png
+          cd .github/scripts
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium
+          node screenshots.mjs http://localhost:8080 "$GITHUB_WORKSPACE/ci-output"
 
       - name: Dump cluster state on failure
         if: failure()
@@ -83,7 +84,7 @@ jobs:
           kubectl logs deployment/backend --all-containers || true
           kubectl logs deployment/frontend --all-containers || true
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: ci-output
