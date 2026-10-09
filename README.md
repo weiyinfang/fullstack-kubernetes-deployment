@@ -12,7 +12,7 @@ readiness and liveness probes decide when a pod gets traffic and when it is rest
 | Layer | Stack | Image |
 |---|---|---|
 | Frontend | React 19, Vite, Tailwind CSS, served by Nginx | `reactjs-ui:v1` |
-| API | Node.js 18, Express 5, Sequelize | `nodejs-backend:v1` |
+| API | Node.js 22, Express 5, Sequelize | `nodejs-backend:v1` |
 | Database | PostgreSQL 17 | `postgres:17-alpine` |
 
 Every push is deployed to a fresh kind cluster by CI (see Continuous integration), which takes
@@ -56,8 +56,8 @@ The database volume has a `Retain` reclaim policy, so the data outlives the pod 
 You need Docker, `kubectl` and a local cluster: minikube, kind or Docker Desktop's Kubernetes.
 
 ```bash
-docker build -t nodejs-backend:v1 ./server   # node:18-alpine, production dependencies only
-docker build -t reactjs-ui:v1     ./client   # two stages: Vite build on node:18, then nginx:stable-alpine
+docker build -t nodejs-backend:v1 ./server   # node:22-alpine, production dependencies only
+docker build -t reactjs-ui:v1     ./client   # two stages: Vite build on node:22-alpine, then nginx:stable-alpine
 ```
 
 The client image is built in two stages. The first installs the dev dependencies and runs
