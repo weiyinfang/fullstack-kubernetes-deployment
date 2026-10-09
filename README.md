@@ -1,5 +1,7 @@
 # Fullstack Kubernetes Deployment
 
+[![CI](https://github.com/weiyinfang/fullstack-kubernetes-deployment/actions/workflows/ci.yml/badge.svg)](https://github.com/weiyinfang/fullstack-kubernetes-deployment/actions/workflows/ci.yml)
+
 A course management web app, with a React frontend, a Node.js API and a PostgreSQL database,
 packaged as Docker images and deployed to a Kubernetes cluster. Users manage students, courses and
 professors, enrol students in courses and assign professors to them. The cluster runs two
@@ -12,6 +14,13 @@ readiness and liveness probes decide when a pod gets traffic and when it is rest
 | Frontend | React 19, Vite, Tailwind CSS, served by Nginx | `reactjs-ui:v1` |
 | API | Node.js 18, Express 5, Sequelize | `nodejs-backend:v1` |
 | Database | PostgreSQL 17 | `postgres:17-alpine` |
+
+Every push is deployed to a fresh kind cluster by CI (see Continuous integration), which takes
+these screenshots of the running app:
+
+![Courses page](docs/images/courses.png)
+
+![Students page](docs/images/students.png)
 
 ## Architecture
 
@@ -90,6 +99,18 @@ curl http://localhost:8080/api/health      # {"status":"OK"} (the API, through N
 curl http://localhost:8080/api/students    # the sample students (the database, through both)
 ```
 
+In CI, `kubectl get pods` after the deploy looks like this:
+
+```
+NAME                            READY   STATUS      RESTARTS   AGE
+pod/backend-57cc58949d-8jg2v    1/1     Running     0          25s
+pod/backend-57cc58949d-cjjpz    1/1     Running     0          25s
+pod/db-migration-lhnbz          0/1     Completed   0          35s
+pod/frontend-c5cf7b9f5-jwfx4    1/1     Running     0          11s
+pod/frontend-c5cf7b9f5-rqxhx    1/1     Running     0          11s
+pod/postgres-5f865544fb-7s9zm   1/1     Running     0          41s
+```
+
 A Job's pod template cannot be changed, so running the migrations again means deleting the Job
 first: `kubectl delete job db-migration`, then apply it again.
 
@@ -129,6 +150,21 @@ whatever state the API is in.
 
 PostgreSQL has no probe here. An `exec` probe running `pg_isready` would be the next step.
 
+## Resource requests and limits
+
+Each Deployment declares how much CPU and memory its container needs and may use. The scheduler
+places a pod only on a node with the requested amount free, and a container that goes over its
+memory limit is killed and restarted.
+
+| Container | Requests (CPU, memory) | Limits (CPU, memory) |
+|---|---|---|
+| frontend | 50m, 32Mi | 200m, 128Mi |
+| backend | 100m, 128Mi | 500m, 256Mi |
+| postgres | 100m, 256Mi | 1 CPU, 512Mi |
+
+The values are sized for a laptop cluster with two replicas of each app. Nginx serving static
+files needs very little; PostgreSQL gets the most memory, for its buffers.
+
 ## Secrets
 
 The database user and password are in a Secret, `postgres-secret`, in `k8s/postgres-secret.yaml`.
@@ -154,6 +190,20 @@ The postgres image reads `POSTGRES_USER` and `POSTGRES_PASSWORD` only the first 
 an empty data directory. Changing the Secret later has no effect on an existing database until
 `/mnt/data` is cleared.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and pull request, in two jobs:
+
+1. API tests: `npm ci` and `npm test` in `server/`. The tests mock the database, so they need no
+   PostgreSQL.
+2. Deploy to kind: builds both images, creates a [kind](https://kind.sigs.k8s.io/) cluster, loads
+   the images into it and applies the manifests in the order above. It then calls `/health`,
+   `/api/health`, `/api/students`, `/api/courses` and `/api/professors` through the frontend,
+   and fails if any of them errors or returns no rows. Playwright takes the screenshots at the top
+   of this file (`.github/scripts/screenshots.mjs`), and the `kubectl get` output and the
+   screenshots are kept as the run's `ci-output` artifact. If a step fails, the job prints the
+   pods, their events and the logs of every container.
+
 ## Running without Kubernetes
 
 ```bash
@@ -169,6 +219,9 @@ cd client && npm install && npm run dev                    # Vite dev server, ca
 
 ```
 README.md                  this file
+.github/workflows/ci.yml   API tests, then a full deploy to a kind cluster
+.github/scripts/           the Playwright script behind the screenshots
+docs/images/               the screenshots
 client/                    the React frontend
   src/components/          the students, courses and professors pages
   src/services/            the API calls, one file per resource
@@ -185,6 +238,6 @@ k8s/
   postgres-secret.yaml     the database credentials
   postgresql.yaml          the volume, the claim, the database Deployment and its Service
   migration-job.yaml       the Job that runs the migrations
-  backend.yaml             the API Deployment and Service, with probes
-  frontend.yaml            the frontend Deployment and Service, with probes
+  backend.yaml             the API Deployment and Service, with probes and resource limits
+  frontend.yaml            the frontend Deployment and Service, with probes and resource limits
 ```
